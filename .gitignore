@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+backend/staticfiles/*
+!backend/staticfiles/.gitkeep
+
+# Node
+node_modules/
+frontend/dist/
+
+# Env and local files
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
