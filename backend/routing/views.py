@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .analysis import ALLOWED_INTERVALS, TripRequest, analyze
-from .providers import Geocoder, ProviderError, RouteProvider, WeatherProvider
+from .providers import Geocoder, NWSWeatherProvider, ProviderError, RouteProvider, WeatherProvider
 
 MAX_FORECAST_DAYS = 14  # Open-Meteo's forecast window is 16 days; leave a margin.
 MAX_LOAD_LBS = 150_000
@@ -28,11 +28,19 @@ def _session() -> requests.Session:
     return session
 
 
+def _nws_session() -> requests.Session:
+    session = requests.Session()
+    session.headers["User-Agent"] = settings.NWS_USER_AGENT
+    session.headers["Accept"] = "application/geo+json"
+    return session
+
+
 # Shared across requests so the weather cache is actually reused.
 _SESSION = _session()
 _GEOCODER = Geocoder(_SESSION, settings.NOMINATIM_BASE_URL, settings.HTTP_TIMEOUT_SECONDS)
 _ROUTES = RouteProvider(_SESSION, settings.OSRM_BASE_URL, settings.HTTP_TIMEOUT_SECONDS)
-_WEATHER = WeatherProvider(_SESSION, settings.OPEN_METEO_BASE_URL, settings.HTTP_TIMEOUT_SECONDS)
+_NWS = NWSWeatherProvider(_nws_session(), settings.NWS_BASE_URL, settings.HTTP_TIMEOUT_SECONDS)
+_WEATHER = WeatherProvider(_SESSION, settings.OPEN_METEO_BASE_URL, settings.HTTP_TIMEOUT_SECONDS, fallback=_NWS)
 
 
 class AnalyzeSerializer(serializers.Serializer):

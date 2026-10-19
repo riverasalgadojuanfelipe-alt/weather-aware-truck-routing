@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from . import risk
-from .geo import cumulative_miles, decimate, sample_along, segment_miles
+from .geo import cumulative_miles, decimate, grid_cell, sample_along, segment_miles
 from .providers import RawRoute, forecast_window
 from .recommend import RouteMetrics, explain, rank
 
@@ -37,15 +37,18 @@ def analyze(req: TripRequest, route_provider, weather_provider) -> dict:
 
     longest_trip = max(r.duration_hours for r in raw_routes)
     start, end = forecast_window(req.departure, longest_trip, HEATMAP_HOURS)
-    all_points = [(s.lat, s.lon) for _, _, samples in prepared for s in samples]
-    series_flat = weather_provider.fetch(all_points, start, end)
+
+    # Routes share many stretches, and the forecast has no finer resolution than
+    # the grid anyway: look each cell up once, in a single batch.
+    cells = sorted({grid_cell((s.lat, s.lon)) for _, _, samples in prepared for s in samples})
+    cell_series = weather_provider.fetch(cells, start, end)
+    by_cell = dict(zip(cells, cell_series))
+    sources = sorted({s.source for s in cell_series if s.source})
 
     routes_out = []
     metrics = []
-    cursor = 0
     for route_id, (raw, cum, samples) in enumerate(prepared):
-        series = series_flat[cursor : cursor + len(samples)]
-        cursor += len(samples)
+        series = [by_cell[grid_cell((s.lat, s.lon))] for s in samples]
 
         total_miles = cum[-1]
         owned = segment_miles([s.mile for s in samples])
@@ -135,6 +138,8 @@ def analyze(req: TripRequest, route_provider, weather_provider) -> dict:
             "reasons": explain(best, [m for m in ranked if m.route_id != best.route_id]),
         },
         "heatmap_hours": HEATMAP_HOURS,
+        # "open-meteo", "nws", or "nws+open-meteo" when a fallback covered only part of the cells.
+        "weather_provider": "+".join(sources) or None,
     }
 
 

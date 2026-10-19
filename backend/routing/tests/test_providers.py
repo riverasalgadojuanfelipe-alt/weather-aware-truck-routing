@@ -111,3 +111,30 @@ def test_series_clamps_outside_the_forecast_window():
     session = FakeSession(FakeResponse(weather_location()))
     series = WeatherProvider(session, "http://x").fetch([(1.0, 1.0)], datetime(2026, 11, 2, tzinfo=timezone.utc), datetime(2026, 11, 2, tzinfo=timezone.utc))[0]
     assert series.at(datetime(2026, 11, 5, tzinfo=timezone.utc))[0] == 23.0
+
+
+def test_weather_provider_requests_one_location_per_grid_cell():
+    session = FakeSession(FakeResponse([weather_location(), weather_location()]))
+    provider = WeatherProvider(session, "http://x")
+    start = datetime(2026, 11, 2, tzinfo=timezone.utc)
+    series = provider.fetch([(30.01, -100.04), (30.04, -100.01), (30.26, -99.0)], start, start)
+    assert len(series) == 3 and series[0] is series[1]
+    params = session.calls[0][1]
+    assert params["latitude"] == "30.0,30.3" and params["longitude"] == "-100.0,-99.0"
+
+
+def test_weather_provider_cache_lasts_an_hour(monkeypatch):
+    from routing import providers
+
+    now = [1_000_000.0]
+    monkeypatch.setattr(providers.time, "time", lambda: now[0])
+    session = FakeSession(FakeResponse(weather_location()), FakeResponse(weather_location()))
+    provider = WeatherProvider(session, "http://x")
+    start = datetime(2026, 11, 2, tzinfo=timezone.utc)
+    provider.fetch([(30.0, -100.0)], start, start)
+    now[0] += 59 * 60
+    provider.fetch([(30.0, -100.0)], start, start)
+    assert len(session.calls) == 1
+    now[0] += 2 * 60
+    provider.fetch([(30.0, -100.0)], start, start)
+    assert len(session.calls) == 2

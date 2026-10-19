@@ -1,6 +1,6 @@
 import pytest
 
-from routing.geo import cumulative_miles, decimate, haversine_miles, sample_along, segment_miles
+from routing.geo import cumulative_miles, decimate, grid_cell, haversine_miles, sample_along, segment_miles
 
 # Roughly a straight line along the equator: 1 degree of longitude ~ 69.17 miles.
 LINE = [(0.0, 0.0), (0.0, 1.0), (0.0, 2.0)]
@@ -55,3 +55,13 @@ def test_decimate_keeps_endpoints_and_limits_size():
     assert len(out) <= 1_001
     assert out[0] == points[0] and out[-1] == points[-1]
     assert decimate(points[:10], 1_000) == points[:10]
+
+
+def test_grid_cell_snaps_to_tenth_of_a_degree():
+    assert grid_cell((32.7767, -96.797)) == (32.8, -96.8)
+    assert grid_cell((32.7499, -96.7501)) == (32.7, -96.8)
+
+
+def test_grid_cell_groups_nearby_points_and_normalises_negative_zero():
+    assert grid_cell((30.01, -100.04)) == grid_cell((30.04, -100.01))
+    assert str(grid_cell((-0.02, 0.02))[0]) == "0.0"

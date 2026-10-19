@@ -71,5 +71,8 @@ REST_FRAMEWORK = {
 OSRM_BASE_URL = os.environ.get("OSRM_BASE_URL", "https://router.project-osrm.org")
 NOMINATIM_BASE_URL = os.environ.get("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org")
 OPEN_METEO_BASE_URL = os.environ.get("OPEN_METEO_BASE_URL", "https://api.open-meteo.com")
+NWS_BASE_URL = os.environ.get("NWS_BASE_URL", "https://api.weather.gov")
 HTTP_USER_AGENT = os.environ.get("HTTP_USER_AGENT", "weather-aware-truck-routing/1.0 (assessment)")
+# api.weather.gov asks clients to identify themselves, ideally with a contact address.
+NWS_USER_AGENT = os.environ.get("NWS_USER_AGENT", HTTP_USER_AGENT)
 HTTP_TIMEOUT_SECONDS = float(os.environ.get("HTTP_TIMEOUT_SECONDS", "20"))

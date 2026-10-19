@@ -7,7 +7,7 @@ A time slider shows a weather-risk heatmap for the next 48 hours.
 
 - **Backend:** Django + Django REST Framework (`backend/`)
 - **Frontend:** React + Vite + Leaflet (`frontend/`)
-- **Data sources (no API keys needed):** OSRM (routes), Open-Meteo (hourly forecast), Nominatim (geocoding)
+- **Data sources (no API keys needed):** OSRM (routes), Open-Meteo (hourly forecast, with the National Weather Service as fallback), Nominatim (geocoding)
 
 ## Run locally
 
@@ -33,8 +33,11 @@ Tests: `cd backend && pytest`.
    waypoints are used to fill the gap. Routes are sorted by duration.
 3. **Checkpoints** are placed every 10, 25 or 50 miles (user choice), always including start and end.
 4. **ETA** at each checkpoint is proportional to distance along the route.
-5. **Weather:** one batched Open-Meteo request per route gets hourly wind, rain, showers and
-   snowfall; each checkpoint reads the hour matching its ETA. Responses are cached for 30 minutes.
+5. **Weather:** checkpoints are snapped to a 0.1° grid and de-duplicated across all routes, then
+   one batched Open-Meteo request per analysis gets hourly wind, rain, showers and snowfall for
+   each cell; each checkpoint reads the hour matching its ETA. If Open-Meteo answers 429 or fails, the
+   missing cells come from the National Weather Service (api.weather.gov, US only), converted to
+   mph and inches per hour. Responses are cached per cell for 60 minutes.
 6. **Risk** per checkpoint is the worst of wind, rain and snow (see below).
 7. **Recommendation** ranks routes by, in order: miles under No Travel, miles under Severe,
    miles under High, mile-weighted average risk, then duration. Each criterion is rounded
@@ -56,7 +59,7 @@ wind level, the rain level and the snow level.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/analyze` | Body: `origin`, `destination`, `departure` (ISO 8601, not in the past, within 14 days), `load_lbs` (0-150000), `interval_miles` (10, 25, 50). Returns routes, checkpoints, summaries and the recommendation. |
+| POST | `/api/analyze` | Body: `origin`, `destination`, `departure` (ISO 8601, not in the past, within 14 days), `load_lbs` (0-150000), `interval_miles` (10, 25, 50). Returns routes, checkpoints, summaries, the recommendation and `weather_provider` (`open-meteo`, `nws`, or `nws+open-meteo` when the fallback covered only part of the route). |
 | GET | `/api/geocode?q=` | Resolve a place name. |
 | GET | `/api/health` | Liveness check. |
 
@@ -70,7 +73,7 @@ backend/
   routing/
     risk.py          threshold rules (pure)
     geo.py           distance, sampling along a polyline
-    providers.py     OSRM, Open-Meteo and Nominatim clients
+    providers.py     OSRM, Open-Meteo, NWS and Nominatim clients
     recommend.py     ranking and explanation
     analysis.py      orchestration of one trip analysis
     views.py         request validation and HTTP layer
@@ -92,6 +95,17 @@ frontend/src/
 
 - Public OSRM, Nominatim and Open-Meteo are rate-limited and best-effort; for production they
   would be self-hosted or replaced by paid tiers.
+- Open-Meteo's free tier has a daily quota that counts every location of a batched request. To stay
+  under it, checkpoints are snapped to a 0.1° grid (about 11 km), so weather is a little coarser
+  than the checkpoint spacing, and the cache lasts 60 minutes, so a forecast can be up to an hour old.
+- When Open-Meteo fails, the National Weather Service (api.weather.gov) is the fallback. It needs
+  no key but covers only the United States, publishes about a week of forecast (a later departure
+  gets a 502 if Open-Meteo is also down), and takes two requests per new cell (one to find the
+  gridpoint, which is cached, and one for the forecast). Its values are converted to the same units
+  and its precipitation is liquid-equivalent, so melted snow is subtracted from rain using a 10:1
+  ratio; results can differ slightly from Open-Meteo. The `weather_provider` field of the response
+  says which service produced the data, and `NWS_USER_AGENT` can add a contact address to the
+  User-Agent that NWS asks clients to send.
 - ETA is distance-proportional rather than segment-by-segment speed, which is accurate enough
   for hourly forecast resolution.
 - The forecast cache is in-process; a shared cache (Redis) would be needed with multiple workers.
