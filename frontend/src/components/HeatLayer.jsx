@@ -17,6 +17,9 @@ export default function HeatLayer({ points }) {
     layer.addTo(map)
     layerRef.current = layer
     return () => {
+      // leaflet.heat schedules a redraw on animation frames and does not cancel it
+      // when removed, which throws once the map is gone (e.g. React StrictMode remounts).
+      L.Util.cancelAnimFrame(layer._frame)
       layer.remove()
       layerRef.current = null
     }
