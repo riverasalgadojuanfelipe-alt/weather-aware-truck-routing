@@ -7,7 +7,7 @@ A time slider shows a weather-risk heatmap for the next 48 hours.
 
 - **Backend:** Django + Django REST Framework (`backend/`)
 - **Frontend:** React + Vite + Leaflet (`frontend/`)
-- **Data sources (no API keys needed):** OSRM (routes), Open-Meteo (hourly forecast), Nominatim (geocoding)
+- **Data sources (no API keys needed):** OSRM (routes), Open-Meteo (hourly forecast, with the National Weather Service as fallback), Nominatim (geocoding)
 
 ## Run locally
 
@@ -35,8 +35,9 @@ Tests: `cd backend && pytest`.
 4. **ETA** at each checkpoint is proportional to distance along the route.
 5. **Weather:** checkpoints are snapped to a 0.1° grid and de-duplicated across all routes, then
    one batched Open-Meteo request per analysis gets hourly wind, rain, showers and snowfall for
-   each cell; each checkpoint reads the hour matching its ETA. Responses are cached per cell for
-   60 minutes.
+   each cell; each checkpoint reads the hour matching its ETA. If Open-Meteo answers 429 or fails, the
+   missing cells come from the National Weather Service (api.weather.gov, US only), converted to
+   mph and inches per hour. Responses are cached per cell for 60 minutes.
 6. **Risk** per checkpoint is the worst of wind, rain and snow (see below).
 7. **Recommendation** ranks routes by, in order: miles under No Travel, miles under Severe,
    miles under High, mile-weighted average risk, then duration. Each criterion is rounded
@@ -72,7 +73,7 @@ backend/
   routing/
     risk.py          threshold rules (pure)
     geo.py           distance, sampling along a polyline
-    providers.py     OSRM, Open-Meteo and Nominatim clients
+    providers.py     OSRM, Open-Meteo, NWS and Nominatim clients
     recommend.py     ranking and explanation
     analysis.py      orchestration of one trip analysis
     views.py         request validation and HTTP layer
