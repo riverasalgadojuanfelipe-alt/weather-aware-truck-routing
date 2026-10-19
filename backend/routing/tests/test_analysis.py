@@ -148,3 +148,20 @@ def test_each_checkpoint_reads_the_series_of_its_cell():
         winds = [c["weather"]["wind_mph"] for c in route["checkpoints"]]
         lons = [c["lon"] for c in route["checkpoints"]]
         assert winds == [round(round(lon, 1) + 200.0, 1) for lon in lons]
+
+
+def test_response_names_the_weather_provider():
+    class Sourced:
+        def __init__(self, *sources):
+            self.sources = sources
+
+        def fetch(self, points, start, end):
+            return [
+                HourlySeries(START, [5.0] * 120, [0.0] * 120, [0.0] * 120, self.sources[i % len(self.sources)])
+                for i, _ in enumerate(points)
+            ]
+
+    assert analyze(trip(), FakeRoutes(), Sourced("open-meteo"))["weather_provider"] == "open-meteo"
+    assert analyze(trip(), FakeRoutes(), Sourced("nws"))["weather_provider"] == "nws"
+    assert analyze(trip(), FakeRoutes(), Sourced("open-meteo", "nws"))["weather_provider"] == "nws+open-meteo"
+    assert analyze(trip(), FakeRoutes(), FakeWeather(5.0))["weather_provider"] is None

@@ -59,7 +59,7 @@ wind level, the rain level and the snow level.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/analyze` | Body: `origin`, `destination`, `departure` (ISO 8601, not in the past, within 14 days), `load_lbs` (0-150000), `interval_miles` (10, 25, 50). Returns routes, checkpoints, summaries and the recommendation. |
+| POST | `/api/analyze` | Body: `origin`, `destination`, `departure` (ISO 8601, not in the past, within 14 days), `load_lbs` (0-150000), `interval_miles` (10, 25, 50). Returns routes, checkpoints, summaries, the recommendation and `weather_provider` (`open-meteo`, `nws`, or `nws+open-meteo` when the fallback covered only part of the route). |
 | GET | `/api/geocode?q=` | Resolve a place name. |
 | GET | `/api/health` | Liveness check. |
 
@@ -95,6 +95,17 @@ frontend/src/
 
 - Public OSRM, Nominatim and Open-Meteo are rate-limited and best-effort; for production they
   would be self-hosted or replaced by paid tiers.
+- Open-Meteo's free tier has a daily quota that counts every location of a batched request. To stay
+  under it, checkpoints are snapped to a 0.1° grid (about 11 km), so weather is a little coarser
+  than the checkpoint spacing, and the cache lasts 60 minutes, so a forecast can be up to an hour old.
+- When Open-Meteo fails, the National Weather Service (api.weather.gov) is the fallback. It needs
+  no key but covers only the United States, publishes about a week of forecast (a later departure
+  gets a 502 if Open-Meteo is also down), and takes two requests per new cell (one to find the
+  gridpoint, which is cached, and one for the forecast). Its values are converted to the same units
+  and its precipitation is liquid-equivalent, so melted snow is subtracted from rain using a 10:1
+  ratio; results can differ slightly from Open-Meteo. The `weather_provider` field of the response
+  says which service produced the data, and `NWS_USER_AGENT` can add a contact address to the
+  User-Agent that NWS asks clients to send.
 - ETA is distance-proportional rather than segment-by-segment speed, which is accurate enough
   for hourly forecast resolution.
 - The forecast cache is in-process; a shared cache (Redis) would be needed with multiple workers.

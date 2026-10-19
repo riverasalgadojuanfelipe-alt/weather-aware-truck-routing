@@ -212,7 +212,14 @@ def test_api_answers_from_the_fallback_when_open_meteo_is_over_quota(api, monkey
     provider, _, _ = make_provider(RATE_LIMITED, nws_session(grid=lambda: nws_grid(today, days=5)))
     monkeypatch.setattr(views, "_WEATHER", provider)
     resp = api.post("/api/analyze", api_payload(), format="json")
-    assert resp.status_code == 200
+    assert resp.status_code == 200 and resp.json()["weather_provider"] == "nws"
+
+
+def test_api_reports_open_meteo_when_it_answers(api, monkeypatch):
+    provider, _, _ = make_provider(lambda url: FakeResponse([weather_location()] * 12))
+    monkeypatch.setattr(views, "_WEATHER", provider)
+    resp = api.post("/api/analyze", api_payload(), format="json")
+    assert resp.status_code == 200 and resp.json()["weather_provider"] == "open-meteo"
 
 
 def test_api_returns_502_with_a_message_when_both_services_fail(api, monkeypatch):

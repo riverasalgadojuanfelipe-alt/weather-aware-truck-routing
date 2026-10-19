@@ -41,7 +41,9 @@ def analyze(req: TripRequest, route_provider, weather_provider) -> dict:
     # Routes share many stretches, and the forecast has no finer resolution than
     # the grid anyway: look each cell up once, in a single batch.
     cells = sorted({grid_cell((s.lat, s.lon)) for _, _, samples in prepared for s in samples})
-    by_cell = dict(zip(cells, weather_provider.fetch(cells, start, end)))
+    cell_series = weather_provider.fetch(cells, start, end)
+    by_cell = dict(zip(cells, cell_series))
+    sources = sorted({s.source for s in cell_series if s.source})
 
     routes_out = []
     metrics = []
@@ -136,6 +138,8 @@ def analyze(req: TripRequest, route_provider, weather_provider) -> dict:
             "reasons": explain(best, [m for m in ranked if m.route_id != best.route_id]),
         },
         "heatmap_hours": HEATMAP_HOURS,
+        # "open-meteo", "nws", or "nws+open-meteo" when a fallback covered only part of the cells.
+        "weather_provider": "+".join(sources) or None,
     }
 
 

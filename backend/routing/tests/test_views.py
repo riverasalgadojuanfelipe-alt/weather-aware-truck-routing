@@ -52,6 +52,7 @@ def test_analyze_happy_path(client):
     assert data["recommendation"]["route_id"] == 0
     assert data["request"]["origin_label"] == "A"
     assert data["routes"][0]["checkpoints"][0]["risk"] == "low"
+    assert "weather_provider" in data
 
 
 @pytest.mark.parametrize(
