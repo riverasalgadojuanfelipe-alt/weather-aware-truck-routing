@@ -33,8 +33,10 @@ Tests: `cd backend && pytest`.
    waypoints are used to fill the gap. Routes are sorted by duration.
 3. **Checkpoints** are placed every 10, 25 or 50 miles (user choice), always including start and end.
 4. **ETA** at each checkpoint is proportional to distance along the route.
-5. **Weather:** one batched Open-Meteo request per route gets hourly wind, rain, showers and
-   snowfall; each checkpoint reads the hour matching its ETA. Responses are cached for 30 minutes.
+5. **Weather:** checkpoints are snapped to a 0.1° grid and de-duplicated across all routes, then
+   one batched Open-Meteo request per analysis gets hourly wind, rain, showers and snowfall for
+   each cell; each checkpoint reads the hour matching its ETA. Responses are cached per cell for
+   60 minutes.
 6. **Risk** per checkpoint is the worst of wind, rain and snow (see below).
 7. **Recommendation** ranks routes by, in order: miles under No Travel, miles under Severe,
    miles under High, mile-weighted average risk, then duration. Each criterion is rounded

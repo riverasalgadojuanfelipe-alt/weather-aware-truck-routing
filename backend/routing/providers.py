@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 
-from .geo import LatLon, METERS_PER_MILE, haversine_miles
+from .geo import LatLon, METERS_PER_MILE, grid_cell, haversine_miles
 
 
 class ProviderError(Exception):
@@ -180,8 +180,8 @@ class HourlySeries:
 class WeatherProvider:
     """Open-Meteo hourly forecast with a small in-process cache."""
 
-    MAX_LOCATIONS_PER_REQUEST = 50
-    CACHE_SECONDS = 30 * 60
+    MAX_LOCATIONS_PER_REQUEST = 200
+    CACHE_SECONDS = 60 * 60
     HOURLY_VARS = "wind_speed_10m,rain,showers,snowfall"
 
     def __init__(self, session: requests.Session, base_url: str, timeout: float = 20):
@@ -195,8 +195,8 @@ class WeatherProvider:
         first_day, last_day = start.date(), end.date()
         day0 = datetime(first_day.year, first_day.month, first_day.day, tzinfo=timezone.utc)
 
-        # Round to ~1 km so neighbouring checkpoints share a request.
-        keys = [(round(lat, 2), round(lon, 2), first_day, last_day) for lat, lon in points]
+        # One cache entry (and one billed API location) per 0.1 degree cell.
+        keys = [(*grid_cell(p), first_day, last_day) for p in points]
         now = time.time()
         missing = sorted({k for k in keys if k not in self._cache or now - self._cache[k][0] > self.CACHE_SECONDS})
 
@@ -206,8 +206,8 @@ class WeatherProvider:
                 self.session,
                 f"{self.base_url}/v1/forecast",
                 {
-                    "latitude": ",".join(str(k[0]) for k in chunk),
-                    "longitude": ",".join(str(k[1]) for k in chunk),
+                    "latitude": ",".join(f"{k[0]:.1f}" for k in chunk),
+                    "longitude": ",".join(f"{k[1]:.1f}" for k in chunk),
                     "hourly": self.HOURLY_VARS,
                     "wind_speed_unit": "mph",
                     "precipitation_unit": "inch",

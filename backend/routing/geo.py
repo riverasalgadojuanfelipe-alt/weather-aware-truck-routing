@@ -11,6 +11,14 @@ METERS_PER_MILE = 1609.344
 
 LatLon = tuple[float, float]
 
+GRID_DEGREES = 0.1
+
+
+def grid_cell(point: LatLon) -> LatLon:
+    """Snap a point to the nearest node of a 0.1 degree grid (about 11 km)."""
+    lat, lon = point
+    return round(lat, 1) + 0.0, round(lon, 1) + 0.0     # + 0.0 turns -0.0 into 0.0
+
 
 def haversine_miles(a: LatLon, b: LatLon) -> float:
     lat1, lon1 = map(math.radians, a)
