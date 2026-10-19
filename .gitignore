@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+*.sqlite3
 backend/staticfiles/*
 !backend/staticfiles/.gitkeep
 
