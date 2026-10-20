@@ -5,8 +5,12 @@ driving routes, samples weather at regular checkpoints along each one, scores th
 truck would face at the time it actually reaches each point, and recommends the safest route.
 A time slider shows a weather-risk heatmap for the next 48 hours.
 
-- **Backend:** Django + Django REST Framework (`backend/`)
-- **Frontend:** React + Vite + Leaflet (`frontend/`)
+Live app: <https://weather-aware-truck-routing-inky.vercel.app>
+
+## Stack
+
+- **Backend:** Django 6.1 + Django REST Framework 3.18 (`backend/`)
+- **Frontend:** React 19 + Vite 7 + Leaflet (`frontend/`)
 - **Data sources (no API keys needed):** OSRM (routes), Open-Meteo (hourly forecast, with the National Weather Service as fallback), Nominatim (geocoding)
 
 ## Run locally
@@ -16,12 +20,14 @@ A time slider shows a weather-risk heatmap for the next 48 hours.
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+python manage.py migrate              # keeps Django's bookkeeping happy; the API has no models
 python manage.py runserver            # http://localhost:8000
 
 # Frontend (second terminal)
 cd frontend
+cp .env.example .env                  # leave VITE_API_URL empty in dev; Vite proxies /api to :8000
 npm install
-npm run dev                           # http://localhost:5173, /api is proxied to :8000
+npm run dev                           # http://localhost:5173
 ```
 
 Tests: `cd backend && pytest`.
@@ -71,6 +77,8 @@ Provider failures return `502` with a readable message.
 backend/
   config/            Django settings and URL root
   routing/
+    apps.py          Django app config
+    urls.py          /api route table
     risk.py          threshold rules (pure)
     geo.py           distance, sampling along a polyline
     providers.py     OSRM, Open-Meteo, NWS and Nominatim clients
@@ -79,10 +87,29 @@ backend/
     views.py         request validation and HTTP layer
     tests/
 frontend/src/
+  main.jsx           React entry point
+  App.jsx            top-level layout and state
   api.js             API client
   lib/               risk palette, formatting, heatmap points
   components/        form, route cards, checkpoint table, map, heat layer, slider
 ```
+
+## Environment variables
+
+| Variable | Where | Default | Purpose |
+| --- | --- | --- | --- |
+| `DJANGO_SECRET_KEY` | backend | dev-only key | Required in production. |
+| `DJANGO_DEBUG` | backend | `1` | Set to `0` in production. |
+| `DJANGO_ALLOWED_HOSTS` | backend | `*` | Comma-separated hostnames. |
+| `CORS_ALLOWED_ORIGINS` | backend | all origins | Comma-separated frontend origins. |
+| `OSRM_BASE_URL` | backend | public OSRM | Point to a self-hosted router. |
+| `NOMINATIM_BASE_URL` | backend | public Nominatim | Point to a self-hosted geocoder. |
+| `OPEN_METEO_BASE_URL` | backend | `api.open-meteo.com` | Primary forecast endpoint. |
+| `NWS_BASE_URL` | backend | `api.weather.gov` | Fallback forecast endpoint. |
+| `HTTP_USER_AGENT` | backend | app identifier | User-Agent for every outbound request. |
+| `NWS_USER_AGENT` | backend | falls back to `HTTP_USER_AGENT` | api.weather.gov asks for a contact address here. |
+| `HTTP_TIMEOUT_SECONDS` | backend | `20` | Per-request timeout for provider calls. |
+| `VITE_API_URL` | frontend | empty (uses dev proxy) | Backend URL in production builds, no trailing slash. |
 
 ## Deployment
 
